@@ -1,0 +1,467 @@
+﻿{
+    "openapi":  "3.1.0",
+    "info":  {
+                 "title":  "Smart Parking - Data Management Service",
+                 "description":  "Service 2: Data Management Service",
+                 "version":  "1.0.0"
+             },
+    "paths":  {
+                  "/internal/events/vehicle":  {
+                                                   "post":  {
+                                                                "tags":  [
+                                                                             "Vehicle Events"
+                                                                         ],
+                                                                "summary":  "Receive Vehicle Event",
+                                                                "description":  "Receive a vehicle event from Service 1.\n\nNormalized relationships:\n\n    event_types\n        â\n    parking_events.event_type_fk\n\n    parking_areas\n        â\n    cameras.parking_area_fk\n\n    vehicle_types\n        â\n    vehicles.vehicle_type_fk\n\n    vehicle_colors\n        â\n    vehicles.color_fk\n\n    vehicles\n        â\n    parking_events.vehicle_fk\n\n    vehicles\n        â\n    parking_sessions.vehicle_fk\n\n    vehicles\n        â\n    parking_slot_state.vehicle_fk\n\n\nService 1 payload is NOT changed.\n\nobserved_* columns preserve what Service 1\nactually observed for the event.\n\nLegacy columns are still populated temporarily because\nthe current database schema still contains NOT NULL\ncompatibility columns. They can be removed later,\nafter all application routes have been migrated.",
+                                                                "operationId":  "receive_vehicle_event_internal_events_vehicle_post",
+                                                                "requestBody":  {
+                                                                                    "content":  {
+                                                                                                    "application/json":  {
+                                                                                                                             "schema":  {
+                                                                                                                                            "$ref":  "#/components/schemas/VehicleEvent"
+                                                                                                                                        }
+                                                                                                                         }
+                                                                                                },
+                                                                                    "required":  true
+                                                                                },
+                                                                "responses":  {
+                                                                                  "200":  {
+                                                                                              "description":  "Successful Response",
+                                                                                              "content":  {
+                                                                                                              "application/json":  {
+                                                                                                                                       "schema":  {
+
+                                                                                                                                                  }
+                                                                                                                                   }
+                                                                                                          }
+                                                                                          },
+                                                                                  "422":  {
+                                                                                              "description":  "Validation Error",
+                                                                                              "content":  {
+                                                                                                              "application/json":  {
+                                                                                                                                       "schema":  {
+                                                                                                                                                      "$ref":  "#/components/schemas/HTTPValidationError"
+                                                                                                                                                  }
+                                                                                                                                   }
+                                                                                                          }
+                                                                                          }
+                                                                              }
+                                                            }
+                                               },
+                  "/api/occupancy":  {
+                                         "get":  {
+                                                     "tags":  [
+                                                                  "Occupancy"
+                                                              ],
+                                                     "summary":  "Get Occupancy",
+                                                     "description":  "Return the current parking occupancy state.\n\nNormalized relationships:\n\n    parking_slot_state\n        âââ camera_id -\u003e cameras.camera_id\n        â                    âââ parking_area_fk -\u003e parking_areas.id\n        â\n        âââ vehicle_fk -\u003e vehicles.id\n\nLegacy cameras.parking_area_id and\nparking_slot_state.plate_number are not used.",
+                                                     "operationId":  "get_occupancy_api_occupancy_get",
+                                                     "responses":  {
+                                                                       "200":  {
+                                                                                   "description":  "Successful Response",
+                                                                                   "content":  {
+                                                                                                   "application/json":  {
+                                                                                                                            "schema":  {
+
+                                                                                                                                       }
+                                                                                                                        }
+                                                                                               }
+                                                                               }
+                                                                   }
+                                                 }
+                                     },
+                  "/api/analytics/summary":  {
+                                                 "get":  {
+                                                             "tags":  [
+                                                                          "Analytics"
+                                                                      ],
+                                                             "summary":  "Get Analytics Summary",
+                                                             "description":  "Return parking analytics summary.\n\nNormalized data sources:\n\n    parking_slot_state\n        -\u003e current occupancy\n\n    parking_events.event_type_fk\n        -\u003e ENTRY / EXIT events\n\n    parking_sessions\n        -\u003e active sessions and parking duration",
+                                                             "operationId":  "get_analytics_summary_api_analytics_summary_get",
+                                                             "responses":  {
+                                                                               "200":  {
+                                                                                           "description":  "Successful Response",
+                                                                                           "content":  {
+                                                                                                           "application/json":  {
+                                                                                                                                    "schema":  {
+
+                                                                                                                                               }
+                                                                                                                                }
+                                                                                                       }
+                                                                                       }
+                                                                           }
+                                                         }
+                                             },
+                  "/api/vehicles/{plate_number}":  {
+                                                       "get":  {
+                                                                   "tags":  [
+                                                                                "Vehicles"
+                                                                            ],
+                                                                   "summary":  "Get Vehicle",
+                                                                   "description":  "Get complete vehicle information.\n\nNormalized relationships:\n\n    vehicles\n        âââ vehicle_type_fk -\u003e vehicle_types\n        âââ color_fk        -\u003e vehicle_colors\n        â\n        âââ vehicle.id\n                âââ parking_events.vehicle_fk\n                âââ parking_sessions.vehicle_fk\n                âââ parking_slot_state.vehicle_fk\n\nLegacy vehicle_type/color columns are NOT used.\nLegacy parking_area_id on cameras is NOT used.",
+                                                                   "operationId":  "get_vehicle_api_vehicles__plate_number__get",
+                                                                   "parameters":  [
+                                                                                      {
+                                                                                          "name":  "plate_number",
+                                                                                          "in":  "path",
+                                                                                          "required":  true,
+                                                                                          "schema":  {
+                                                                                                         "type":  "string",
+                                                                                                         "title":  "Plate Number"
+                                                                                                     }
+                                                                                      }
+                                                                                  ],
+                                                                   "responses":  {
+                                                                                     "200":  {
+                                                                                                 "description":  "Successful Response",
+                                                                                                 "content":  {
+                                                                                                                 "application/json":  {
+                                                                                                                                          "schema":  {
+
+                                                                                                                                                     }
+                                                                                                                                      }
+                                                                                                             }
+                                                                                             },
+                                                                                     "422":  {
+                                                                                                 "description":  "Validation Error",
+                                                                                                 "content":  {
+                                                                                                                 "application/json":  {
+                                                                                                                                          "schema":  {
+                                                                                                                                                         "$ref":  "#/components/schemas/HTTPValidationError"
+                                                                                                                                                     }
+                                                                                                                                      }
+                                                                                                             }
+                                                                                             }
+                                                                                 }
+                                                               }
+                                                   },
+                  "/api/snapshots/vehicle/{plate_number}":  {
+                                                                "get":  {
+                                                                            "tags":  [
+                                                                                         "Snapshots"
+                                                                                     ],
+                                                                            "summary":  "Get Vehicle Snapshots",
+                                                                            "description":  "Return vehicle and license-plate snapshots for a vehicle.\n\nCanonical vehicle identity is resolved through:\n\n    vehicles.id\n        â\n    parking_sessions.vehicle_fk\n        â\n    parking_events.vehicle_fk\n\nparking_events.vehicle_snapshot and plate_snapshot contain\nthe snapshot paths captured for each event.",
+                                                                            "operationId":  "get_vehicle_snapshots_api_snapshots_vehicle__plate_number__get",
+                                                                            "parameters":  [
+                                                                                               {
+                                                                                                   "name":  "plate_number",
+                                                                                                   "in":  "path",
+                                                                                                   "required":  true,
+                                                                                                   "schema":  {
+                                                                                                                  "type":  "string",
+                                                                                                                  "title":  "Plate Number"
+                                                                                                              }
+                                                                                               }
+                                                                                           ],
+                                                                            "responses":  {
+                                                                                              "200":  {
+                                                                                                          "description":  "Successful Response",
+                                                                                                          "content":  {
+                                                                                                                          "application/json":  {
+                                                                                                                                                   "schema":  {
+
+                                                                                                                                                              }
+                                                                                                                                               }
+                                                                                                                      }
+                                                                                                      },
+                                                                                              "422":  {
+                                                                                                          "description":  "Validation Error",
+                                                                                                          "content":  {
+                                                                                                                          "application/json":  {
+                                                                                                                                                   "schema":  {
+                                                                                                                                                                  "$ref":  "#/components/schemas/HTTPValidationError"
+                                                                                                                                                              }
+                                                                                                                                               }
+                                                                                                                      }
+                                                                                                      }
+                                                                                          }
+                                                                        }
+                                                            },
+                  "/health":  {
+                                  "get":  {
+                                              "summary":  "Health",
+                                              "operationId":  "health_health_get",
+                                              "responses":  {
+                                                                "200":  {
+                                                                            "description":  "Successful Response",
+                                                                            "content":  {
+                                                                                            "application/json":  {
+                                                                                                                     "schema":  {
+
+                                                                                                                                }
+                                                                                                                 }
+                                                                                        }
+                                                                        }
+                                                            }
+                                          }
+                              },
+                  "/health/database":  {
+                                           "get":  {
+                                                       "summary":  "Database Health",
+                                                       "operationId":  "database_health_health_database_get",
+                                                       "responses":  {
+                                                                         "200":  {
+                                                                                     "description":  "Successful Response",
+                                                                                     "content":  {
+                                                                                                     "application/json":  {
+                                                                                                                              "schema":  {
+
+                                                                                                                                         }
+                                                                                                                          }
+                                                                                                 }
+                                                                                 }
+                                                                     }
+                                                   }
+                                       }
+              },
+    "components":  {
+                       "schemas":  {
+                                       "HTTPValidationError":  {
+                                                                   "properties":  {
+                                                                                      "detail":  {
+                                                                                                     "items":  {
+                                                                                                                   "$ref":  "#/components/schemas/ValidationError"
+                                                                                                               },
+                                                                                                     "type":  "array",
+                                                                                                     "title":  "Detail"
+                                                                                                 }
+                                                                                  },
+                                                                   "type":  "object",
+                                                                   "title":  "HTTPValidationError"
+                                                               },
+                                       "ParkingData":  {
+                                                           "properties":  {
+                                                                              "slot_id":  {
+                                                                                              "anyOf":  [
+                                                                                                            {
+                                                                                                                "type":  "string"
+                                                                                                            },
+                                                                                                            {
+                                                                                                                "type":  "null"
+                                                                                                            }
+                                                                                                        ],
+                                                                                              "title":  "Slot Id"
+                                                                                          },
+                                                                              "slot_confidence":  {
+                                                                                                      "anyOf":  [
+                                                                                                                    {
+                                                                                                                        "type":  "number"
+                                                                                                                    },
+                                                                                                                    {
+                                                                                                                        "type":  "null"
+                                                                                                                    }
+                                                                                                                ],
+                                                                                                      "title":  "Slot Confidence"
+                                                                                                  }
+                                                                          },
+                                                           "type":  "object",
+                                                           "title":  "ParkingData"
+                                                       },
+                                       "SnapshotData":  {
+                                                            "properties":  {
+                                                                               "vehicle":  {
+                                                                                               "anyOf":  [
+                                                                                                             {
+                                                                                                                 "type":  "string"
+                                                                                                             },
+                                                                                                             {
+                                                                                                                 "type":  "null"
+                                                                                                             }
+                                                                                                         ],
+                                                                                               "title":  "Vehicle"
+                                                                                           },
+                                                                               "plate":  {
+                                                                                             "anyOf":  [
+                                                                                                           {
+                                                                                                               "type":  "string"
+                                                                                                           },
+                                                                                                           {
+                                                                                                               "type":  "null"
+                                                                                                           }
+                                                                                                       ],
+                                                                                             "title":  "Plate"
+                                                                                         }
+                                                                           },
+                                                            "type":  "object",
+                                                            "title":  "SnapshotData"
+                                                        },
+                                       "ValidationError":  {
+                                                               "properties":  {
+                                                                                  "loc":  {
+                                                                                              "items":  {
+                                                                                                            "anyOf":  [
+                                                                                                                          {
+                                                                                                                              "type":  "string"
+                                                                                                                          },
+                                                                                                                          {
+                                                                                                                              "type":  "integer"
+                                                                                                                          }
+                                                                                                                      ]
+                                                                                                        },
+                                                                                              "type":  "array",
+                                                                                              "title":  "Location"
+                                                                                          },
+                                                                                  "msg":  {
+                                                                                              "type":  "string",
+                                                                                              "title":  "Message"
+                                                                                          },
+                                                                                  "type":  {
+                                                                                               "type":  "string",
+                                                                                               "title":  "Error Type"
+                                                                                           },
+                                                                                  "input":  {
+                                                                                                "title":  "Input"
+                                                                                            },
+                                                                                  "ctx":  {
+                                                                                              "type":  "object",
+                                                                                              "title":  "Context"
+                                                                                          }
+                                                                              },
+                                                               "type":  "object",
+                                                               "required":  [
+                                                                                "loc",
+                                                                                "msg",
+                                                                                "type"
+                                                                            ],
+                                                               "title":  "ValidationError"
+                                                           },
+                                       "VehicleData":  {
+                                                           "properties":  {
+                                                                              "type":  {
+                                                                                           "anyOf":  [
+                                                                                                         {
+                                                                                                             "type":  "string"
+                                                                                                         },
+                                                                                                         {
+                                                                                                             "type":  "null"
+                                                                                                         }
+                                                                                                     ],
+                                                                                           "title":  "Type"
+                                                                                       },
+                                                                              "type_confidence":  {
+                                                                                                      "anyOf":  [
+                                                                                                                    {
+                                                                                                                        "type":  "number"
+                                                                                                                    },
+                                                                                                                    {
+                                                                                                                        "type":  "null"
+                                                                                                                    }
+                                                                                                                ],
+                                                                                                      "title":  "Type Confidence"
+                                                                                                  },
+                                                                              "color":  {
+                                                                                            "anyOf":  [
+                                                                                                          {
+                                                                                                              "type":  "string"
+                                                                                                          },
+                                                                                                          {
+                                                                                                              "type":  "null"
+                                                                                                          }
+                                                                                                      ],
+                                                                                            "title":  "Color"
+                                                                                        },
+                                                                              "color_confidence":  {
+                                                                                                       "anyOf":  [
+                                                                                                                     {
+                                                                                                                         "type":  "number"
+                                                                                                                     },
+                                                                                                                     {
+                                                                                                                         "type":  "null"
+                                                                                                                     }
+                                                                                                                 ],
+                                                                                                       "title":  "Color Confidence"
+                                                                                                   },
+                                                                              "plate":  {
+                                                                                            "anyOf":  [
+                                                                                                          {
+                                                                                                              "type":  "string"
+                                                                                                          },
+                                                                                                          {
+                                                                                                              "type":  "null"
+                                                                                                          }
+                                                                                                      ],
+                                                                                            "title":  "Plate"
+                                                                                        },
+                                                                              "plate_confidence":  {
+                                                                                                       "anyOf":  [
+                                                                                                                     {
+                                                                                                                         "type":  "number"
+                                                                                                                     },
+                                                                                                                     {
+                                                                                                                         "type":  "null"
+                                                                                                                     }
+                                                                                                                 ],
+                                                                                                       "title":  "Plate Confidence"
+                                                                                                   }
+                                                                          },
+                                                           "type":  "object",
+                                                           "title":  "VehicleData"
+                                                       },
+                                       "VehicleEvent":  {
+                                                            "properties":  {
+                                                                               "event_type":  {
+                                                                                                  "type":  "string",
+                                                                                                  "title":  "Event Type"
+                                                                                              },
+                                                                               "camera_id":  {
+                                                                                                 "type":  "string",
+                                                                                                 "title":  "Camera Id"
+                                                                                             },
+                                                                               "parking_area_id":  {
+                                                                                                       "type":  "string",
+                                                                                                       "title":  "Parking Area Id"
+                                                                                                   },
+                                                                               "track_id":  {
+                                                                                                "anyOf":  [
+                                                                                                              {
+                                                                                                                  "type":  "integer"
+                                                                                                              },
+                                                                                                              {
+                                                                                                                  "type":  "null"
+                                                                                                              }
+                                                                                                          ],
+                                                                                                "title":  "Track Id"
+                                                                                            },
+                                                                               "timestamp":  {
+                                                                                                 "type":  "string",
+                                                                                                 "format":  "date-time",
+                                                                                                 "title":  "Timestamp"
+                                                                                             },
+                                                                               "vehicle":  {
+                                                                                               "$ref":  "#/components/schemas/VehicleData"
+                                                                                           },
+                                                                               "parking":  {
+                                                                                               "anyOf":  [
+                                                                                                             {
+                                                                                                                 "$ref":  "#/components/schemas/ParkingData"
+                                                                                                             },
+                                                                                                             {
+                                                                                                                 "type":  "null"
+                                                                                                             }
+                                                                                                         ]
+                                                                                           },
+                                                                               "snapshot":  {
+                                                                                                "anyOf":  [
+                                                                                                              {
+                                                                                                                  "$ref":  "#/components/schemas/SnapshotData"
+                                                                                                              },
+                                                                                                              {
+                                                                                                                  "type":  "null"
+                                                                                                              }
+                                                                                                          ]
+                                                                                            }
+                                                                           },
+                                                            "type":  "object",
+                                                            "required":  [
+                                                                             "event_type",
+                                                                             "camera_id",
+                                                                             "parking_area_id",
+                                                                             "timestamp",
+                                                                             "vehicle"
+                                                                         ],
+                                                            "title":  "VehicleEvent"
+                                                        }
+                                   }
+                   }
+}

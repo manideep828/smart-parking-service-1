@@ -1,0 +1,6 @@
+numpy
+scipy
+pyyaml
+opencv-python
+onnxruntime            # CPU build. Do NOT install onnxruntime-gpu.
+fast-alpr[onnx]        # plate detector + OCR (ONNX). Needs Python 3.10+

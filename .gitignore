@@ -1,0 +1,70 @@
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Backups / temporary files
+*_backup*
+*.bak
+*.old
+*.orig
+*.tmp
+*.swp
+
+# Videos / media
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+
+# Runtime databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs / generated output
+*.log
+logs/
+runs/
+outputs/
+storage/
+storage/uploads/
+
+# Local model/cache files
+models/
+.cache/
+.pytest_cache/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+data/*
+!data/geometry_vid1005.json
+!data/geometry_video_test.json
+!data/geometry_vn20261005.json
+!data/geometry_fullres_test.json
+!data/run_vid1005.py
+!data/run_vn20261005.py
+!data/.gitkeep
+# Root debug / temporary files
+anpr_debug.txt
+anpr_run.txt
+fix_entry.py
+fix_exit.py
+fix_release.py
+fix_tripwire_debug.py
+# Project backup files
+*.bak*
+*.backup*
+*.before_*
+*.bak_before_*

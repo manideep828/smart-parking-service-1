@@ -1,0 +1,25 @@
+# Only keys you want to change need to be here; everything else has defaults (s1/config.py).
+camera_id: CAM-01
+parking_area_id: AREA-01
+source: sample.mp4            # video file for tuning, or rtsp://user:pass@192.168.1.10:554/stream
+replay: realtime              # realtime = drops frames like a live camera; sync = every frame
+geometry_file: config/geometry.json
+
+detector:
+  model_path: models/yolox_nano.onnx
+  max_fps: 5
+  threads: 2
+
+plate:
+  enabled: true
+  min_vehicle_height_px: 70
+  interval_s: 0.1          # Check OCR more frequently during entry
+  confirm_reads: 2         # Lower required consistent reads to lock in faster
+  confirm_conf: 0.40       # Slightly relax confidence requirement
+  emit_deadline_s: 5.0     # Give it more time before timing out
+
+publisher:
+  outbox_db: data/outbox_live.db
+  s2_url: https://smart-parking-data-service.onrender.com/internal/events/vehicle
+
+replay_start_time: 1791175309
