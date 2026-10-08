@@ -1,6 +1,7 @@
 import argparse
 import logging
 import time
+from collections import Counter
 
 import cv2
 
@@ -90,7 +91,13 @@ def run(
                 "events will not be sent to Service 2"
             )
         else:
-            publisher = S2Mapper(UploadingOutbox(cfg["publisher"]["outbox_db"], cfg["publisher"]["s2_url"], timeout=30.0))
+            publisher = S2Mapper(
+                UploadingOutbox(
+                    cfg["publisher"]["outbox_db"],
+                    cfg["publisher"]["s2_url"],
+                    timeout=30.0,
+                )
+            )
 
     if plate_worker is None and cfg["plate"]["enabled"]:
         p = cfg["plate"]
@@ -115,6 +122,7 @@ def run(
         time.time(),
     )
     frame = first
+    event_counts = Counter()
 
     try:
         while frame is not None:
@@ -124,9 +132,12 @@ def run(
                 last_proc_ts = frame.ts
 
                 for ev in pipe.process(frame):
+                    event_type = ev["event_type"]
+                    event_counts[event_type] += 1
+
                     log.info(
                         "%s %s plate=%s bay=%s t=%s",
-                        ev["event_type"],
+                        event_type,
                         ev.get("direction") or "",
                         (ev.get("plate") or {}).get("text"),
                         (ev.get("bay") or {}).get("id"),
@@ -176,6 +187,16 @@ def run(
 
         try:
             pipe.flush(time.time())
+
+            log.info(
+                "EVENT SUMMARY: ENTRY=%d PARK_START=%d PARK_END=%d EXIT=%d TOTAL=%d",
+                event_counts["ENTRY"],
+                event_counts["PARK_START"],
+                event_counts["PARK_END"],
+                event_counts["EXIT"],
+                sum(event_counts.values()),
+            )
+
         except Exception:
             log.exception("pipeline flush failed")
 

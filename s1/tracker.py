@@ -1,3 +1,4 @@
+
 from collections import Counter, deque
 
 import numpy as np
@@ -29,16 +30,35 @@ class Track:
         self.cls_votes = Counter({int(cls): 1})
         self.first_ts = self.last_ts = ts
         self.hits = 1
-        self.vel = np.zeros(2)                    # centre velocity, px/s
-        self.history = deque()                    # (ts, cx, bottom_y, width)
+        self.vel = np.zeros(2)  # centre velocity, px/s
+
+        # Existing history format is preserved for SlotManager.
+        self.history = deque()  # (ts, cx, bottom_y, width)
+
+        # New independent history for apparent-size direction detection.
+        # Entries: (ts, width, height, area)
+        self.size_history = deque()
+
         self.confirmed = False
         self._push(ts)
 
     def _push(self, ts):
         x1, y1, x2, y2 = self.bbox
-        self.history.append((ts, (x1 + x2) / 2, y2, x2 - x1))
+        width = max(0.0, float(x2 - x1))
+        height = max(0.0, float(y2 - y1))
+
+        self.history.append(
+            (ts, (x1 + x2) / 2, y2, width)
+        )
+        self.size_history.append(
+            (ts, width, height, width * height)
+        )
+
         while self.history and ts - self.history[0][0] > HISTORY_S:
             self.history.popleft()
+
+        while self.size_history and ts - self.size_history[0][0] > HISTORY_S:
+            self.size_history.popleft()
 
     def predict(self, ts):
         dt = min(max(ts - self.last_ts, 0.0), 1.0)
@@ -47,8 +67,14 @@ class Track:
 
     def update(self, bbox, score, cls, ts):
         dt = max(ts - self.last_ts, 1e-3)
-        old_c = np.array([(self.bbox[0] + self.bbox[2]) / 2, (self.bbox[1] + self.bbox[3]) / 2])
-        new_c = np.array([(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2])
+        old_c = np.array([
+            (self.bbox[0] + self.bbox[2]) / 2,
+            (self.bbox[1] + self.bbox[3]) / 2,
+        ])
+        new_c = np.array([
+            (bbox[0] + bbox[2]) / 2,
+            (bbox[1] + bbox[3]) / 2,
+        ])
         self.vel = 0.6 * self.vel + 0.4 * (new_c - old_c) / dt
         self.bbox = np.array(bbox, float)
         self.score = float(score)
@@ -87,30 +113,51 @@ class ByteTracker:
                 matches.append((tidx[r], c))
                 mt.add(tidx[r])
                 md.add(c)
-        return (matches,
-                [t for t in tidx if t not in mt],
-                [d for d in range(len(dets)) if d not in md])
+        return (
+            matches,
+            [t for t in tidx if t not in mt],
+            [d for d in range(len(dets)) if d not in md],
+        )
 
     def update(self, dets, ts):
-        dets = np.zeros((0, 6)) if dets is None or len(dets) == 0 else np.asarray(dets, float)
+        dets = (
+            np.zeros((0, 6))
+            if dets is None or len(dets) == 0
+            else np.asarray(dets, float)
+        )
         high = dets[dets[:, 4] >= self.high_thr]
-        low = dets[(dets[:, 4] >= self.low_thr) & (dets[:, 4] < self.high_thr)]
-        preds = np.array([t.predict(ts) for t in self.tracks]) if self.tracks else np.zeros((0, 4))
+        low = dets[
+            (dets[:, 4] >= self.low_thr)
+            & (dets[:, 4] < self.high_thr)
+        ]
+        preds = (
+            np.array([t.predict(ts) for t in self.tracks])
+            if self.tracks else np.zeros((0, 4))
+        )
 
-        m1, un_t, un_d = self._associate(preds, list(range(len(self.tracks))), high, self.match_iou)
+        m1, un_t, un_d = self._associate(
+            preds, list(range(len(self.tracks))), high, self.match_iou
+        )
         for ti, di in m1:
             d = high[di]
             self.tracks[ti].update(d[:4], d[4], d[5], ts)
 
-        recent = [t for t in un_t if ts - self.tracks[t].last_ts <= 1.0]
-        m2, _, _ = self._associate(preds, recent, low, self.low_match_iou)
+        recent = [
+            t for t in un_t
+            if ts - self.tracks[t].last_ts <= 1.0
+        ]
+        m2, _, _ = self._associate(
+            preds, recent, low, self.low_match_iou
+        )
         for ti, di in m2:
             d = low[di]
             self.tracks[ti].update(d[:4], d[4], d[5], ts)
 
         for di in un_d:
             d = high[di]
-            self.tracks.append(Track(self._next, d[:4], d[4], d[5], ts))
+            self.tracks.append(
+                Track(self._next, d[:4], d[4], d[5], ts)
+            )
             self._next += 1
 
         for t in self.tracks:
@@ -125,5 +172,8 @@ class ByteTracker:
             else:
                 alive.append(t)
         self.tracks = alive
-        active = [t for t in self.tracks if t.last_ts == ts and t.confirmed]
+        active = [
+            t for t in self.tracks
+            if t.last_ts == ts and t.confirmed
+        ]
         return active, removed

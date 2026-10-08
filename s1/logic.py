@@ -137,11 +137,9 @@ class Tripwire:
 
                 st["last_d"], st["last_ts"] = d, ts
 
-                if change >= self.min_size_change:
-                    return "entry", candidate["cross_ts"]
+                if abs(change) >= self.min_size_change:
+                    return candidate["direction"], candidate["cross_ts"]
 
-                if change <= -self.min_size_change:
-                    return "exit", candidate["cross_ts"]
 
                 return None
 
@@ -179,6 +177,7 @@ class Tripwire:
                     "cross_ts": cross_ts,
                     "before": before[-self.size_samples :],
                     "after": [],
+                    "direction": "entry" if side == self.inside_side else "exit",
                 }
 
         st["last_d"], st["last_ts"] = d, ts
@@ -580,4 +579,7 @@ class SlotManager:
                 del self.occupants[sid]
 
         return events
+
+
+
 

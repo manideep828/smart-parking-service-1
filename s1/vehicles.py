@@ -33,6 +33,7 @@ class Vehicle:
     any_emitted: bool = False
     emitted_plate: str = None
     slot_id: str = None
+    has_parked: bool = False
 
     # Last tracker observation, used only for safe identity recovery.
     last_bbox: object = None

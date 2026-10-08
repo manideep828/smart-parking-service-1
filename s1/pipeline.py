@@ -1,4 +1,4 @@
-﻿import base64
+import base64
 import logging
 import os
 import time
@@ -429,7 +429,7 @@ class Pipeline:
     def _plate_ready(self, v):
         """Require a finalized, valid plate before releasing lifecycle events."""
         c = v.voter.consensus()
-        return bool(v.plate_final and c and c.valid and c.text)
+        return bool(c and c.valid and c.text)
 
     def _build_and_append(self, out, pending):
         """Build an event while preserving its original time and stable ID."""
@@ -682,13 +682,6 @@ class Pipeline:
                     pc["confirm_conf"],
                 )
 
-                log.warning(
-                    "PLATE_VOTER_DEBUG uid=%s reads=%s consensus=%s final=%s",
-                    uid,
-                    v.voter.reads,
-                    v.voter.consensus(),
-                    v.plate_final,
-                )
                 if v.plate_final:
                     # No more crop retries are needed for this vehicle.
                     for pending in self.pending_parking_events:
@@ -707,6 +700,20 @@ class Pipeline:
             if self._plate_ready(v):
                 self._build_and_append(out, pending)
                 continue
+                self._build_and_append(out, pending)
+                continue
+
+            if now >= pending["deadline"] and not pending["timed_out"]:
+                pending["timed_out"] = True
+                log.error(
+                    "PLATE_WAIT_TIMEOUT event=%s event_id=%s vehicle=%s "
+                    "original_event_time=%s; event retained and NOT sent "
+                    "without a valid finalized plate",
+                    pending["event_type"],
+                    pending["event_id"],
+                    v.uid,
+                    pending["event_time"],
+                )
 
             if final:
                 log.error(
@@ -719,20 +726,11 @@ class Pipeline:
                     pending["event_time"],
                     v.plate_final,
                 )
-            elif now >= pending["deadline"]:
-                log.error(
-                    "PLATE_WAIT_TIMEOUT event=%s event_id=%s vehicle=%s "
-                    "original_event_time=%s; event retained and NOT sent "
-                    "without a valid finalized plate",
-                    pending["event_type"],
-                    pending["event_id"],
-                    v.uid,
-                    pending["event_time"],
-                )
 
             remaining.append(pending)
 
         self.pending_parking_events = remaining
+        self._persist_all_pending_events()
 
     def process(self, frame):
         t0 = time.perf_counter()
@@ -752,28 +750,6 @@ class Pipeline:
             self.slots.on_track_removed(t)
 
             v = self.registry.by_track.get(t.id)
-
-            if v is not None and v.pending_exit_crossing_ts is not None:
-                exit_ts = v.pending_exit_crossing_ts
-                v.pending_exit_crossing_ts = None
-
-                log.info(
-                    "Deferred EXIT confirmed by tracker removal "
-                    "track=%s vehicle=%s crossing_ts=%.3f",
-                    t.id,
-                    v.uid,
-                    exit_ts,
-                )
-
-                self._emit(
-                    events,
-                    "EXIT",
-                    v,
-                    exit_ts,
-                    direction="exit",
-                    sid=None,
-                    inferred=False,
-                )
             if v is not None:
                 v.pending.clear()
             self.registry.drop_track(t.id)
@@ -840,6 +816,9 @@ class Pipeline:
 
             # Tripwire is used only as positional/directional evidence.
             # Parking state is authoritative for ENTRY/EXIT lifecycle events.
+            # Tripwire confirms gate ENTRY/EXIT. SlotManager independently
+            # owns PARK_START/PARK_END. Lifecycle events pass through
+            # the existing plate-validation hold in _emit().
             if crossing:
                 direction, crossing_ts = crossing
 
@@ -854,33 +833,18 @@ class Pipeline:
                         inferred=False,
                     )
                     v.pending_entry_received_at = None
-                else:
-                    log.warning(
-                        "TRIPWIRE_EXIT_CANDIDATE track=%s vehicle=%s slot_id=%s "
-                        "crossing_ts=%.3f frame_ts=%.3f",
-                        t.id,
-                        v.uid,
-                        v.slot_id,
-                        crossing_ts,
-                        frame.ts,
-                    )
 
-                    if v.slot_id is not None:
-                        self._emit(
-                            events,
-                            "EXIT",
-                            v,
-                            crossing_ts,
-                            direction="exit",
-                            sid=v.slot_id,
-                            inferred=False,
-                        )
-                    else:
-                        # Do not immediately emit a slotless EXIT.
-                        # The vehicle may still enter a parking slot after crossing
-                        # the tripwire. Defer the EXIT until the vehicle is confirmed
-                        # to have left the tracker without parking.
-                        v.pending_exit_crossing_ts = crossing_ts
+                elif direction == "exit":
+                    self._emit(
+                        events,
+                        "EXIT",
+                        v,
+                        crossing_ts,
+                        direction="exit",
+                        sid=v.slot_id,
+                        inferred=False,
+                    )
+                    v.pending_exit_crossing_ts = None
 
                 log.debug(
                     "Tripwire crossing track=%s direction=%s ts=%.3f",
@@ -889,6 +853,7 @@ class Pipeline:
                     crossing_ts,
                 )
             self._maybe_submit_plate(t, v, frame)
+
 
         # Retry recovered crops before polling so their results can be applied
         # by the normal result handler below.
@@ -941,10 +906,8 @@ class Pipeline:
                     v_state,
                 )
 
-        # SlotManager owns parking-slot transitions.
-        # A confirmed tripwire entry becomes ENTRY when parking is confirmed.
-        # PARK_START remains the authoritative parking-state transition.
-        # EXIT will be handled separately after ENTRY is verified.
+        # SlotManager owns parking-slot transitions. Preserve their event types
+        # rather than incorrectly translating them into gate ENTRY/EXIT.
         for slot_event, v, et, sid, inferred in self.slots.update(
             tracks,
             frame.ts,
@@ -957,26 +920,11 @@ class Pipeline:
                 )
                 continue
 
-            if slot_event == "PARK_START":
-                # A previously deferred tripwire EXIT was only a candidate.
-                # Once parking is confirmed, that candidate was a false exit.
-                v.pending_exit_crossing_ts = None
-
-                if v.pending_entry_received_at is not None:
-                    self._emit(
-                        events,
-                        "ENTRY",
-                        v,
-                        v.pending_entry_received_at,
-                        direction="entry",
-                        sid=sid,
-                        inferred=False,
-                    )
-                    v.pending_entry_received_at = None
+            event_type = slot_event
 
             self._emit(
                 events,
-                slot_event,
+                event_type,
                 v,
                 et,
                 sid=sid,
@@ -987,7 +935,6 @@ class Pipeline:
                 self.registry.release(v)
 
         self._release_ready_parking_events(events)
-
 
         # Preserve the existing late plate-update behavior.
         for v in list(self.registry.by_uid.values()):
